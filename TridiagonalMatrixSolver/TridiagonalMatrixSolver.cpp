@@ -7,6 +7,7 @@
 #include <iomanip>
 
 #include "solve.h"
+#include "Chart.h"
 
 using namespace std;
 using namespace System;
@@ -80,7 +81,6 @@ int main(array<System::String ^> ^args)
 		solveMatrix(matr_size, a, c, b, &f[1], &phi[t][1]);
 	}
 
-	cout << fixed << setprecision(2);
 	Console::WriteLine(L"Problem solved");
 
 	//Console::Write(L"{0,6}", "");
@@ -111,10 +111,6 @@ int main(array<System::String ^> ^args)
 		Console::WriteLine();
 	}
 
-
-
-
-
 	//BEGIN: TEST EXAMPLE
 	/*const int n1 = 5;
 	double aa[n1] = {0,2,1,1,1};
@@ -130,7 +126,10 @@ int main(array<System::String ^> ^args)
 	}*/
 	//END: TEST EXAMPLE
 
-	getch();
+	Chart^ chart = gcnew Chart(phi, TIME_LOWER_BOUND, time_steps, tau, COORD_LOWER_BOUND, coord_steps, h);
+	chart -> ShowDialog();
+
+	system("pause");
 	for (int i = 0; i < time_steps; i++){
 		delete[] phi[i];
 	}

@@ -41,3 +41,8 @@ double source(double coord){
 	double result = exp(-(coord - 2) / 8);
 	return result;
 }
+
+double source2D(double x, double y){
+	double result = exp(-(x + y - 4) / 8);
+	return result;
+}
