@@ -7,6 +7,7 @@
 
 using namespace std;
 using namespace System;
+using namespace System::Globalization;
 
 int main(array<System::String ^> ^args){
 	const int TIME_LOWER_BOUND = 0;
@@ -35,6 +36,9 @@ int main(array<System::String ^> ^args){
 		phi[t] = new double*[coord_x_steps];
 		for (int x = 0; x < coord_x_steps; x++){
 			phi[t][x] = new double[coord_y_steps];
+			for (int y = 0; y < coord_x_steps; y++){
+				phi[t][x][y] = -1;
+			}
 		}
 	}
 	//set phi values according to boundary conditions
@@ -82,24 +86,27 @@ int main(array<System::String ^> ^args){
 			}
 		}	
 		//solve equations systems
-		for (int y = 1; y < matr_size_y; y++){
+		for (int y = 1; y <= matr_size_y; y++){
 			for (int x = 1; x <= matr_size_x; x++){
 				if (x == 1){
-					f[x] = phi[t-1][x][y] * (1/tau - mu/(delta_x *delta_x)) + mu/(2 * delta_x * delta_x) * (phi[t][x-1][y] + phi[t-1][x+1][y] + phi[t-1][x-1][y]); 
+					f[x-1] = phi[t-1][x][y] * (1/tau - mu/(delta_x *delta_x)) + 
+						mu/(2 * delta_x * delta_x) * (phi[t][x-1][y] + phi[t-1][x+1][y] + phi[t-1][x-1][y]); 
 				} else if (x == matr_size_x){
-					f[x] = phi[t-1][x][y] * (1/tau - mu/(delta_x * delta_x)) +  mu/(2 * delta_x * delta_x) * (phi[t][x+1][y] + phi[t-1][x+1][y] + phi[t-1][x-1][y]);
+					f[x-1] = phi[t-1][x][y] * (1/tau - mu/(delta_x * delta_x)) +  
+						mu/(2 * delta_x * delta_x) * (phi[t][x+1][y] + phi[t-1][x+1][y] + phi[t-1][x-1][y]);
 				}
 				else{
-					f[x] = phi[t-1][x][y] * (1/tau - mu/(delta_x * delta_x)) +  mu/(2 * delta_x * delta_x) * (phi[t-1][x+1][y] + phi[t-1][x-1][y]);
+					f[x-1] = phi[t-1][x][y] * (1/tau - mu/(delta_x * delta_x)) +  
+						mu/(2 * delta_x * delta_x) * (phi[t-1][x+1][y] + phi[t-1][x-1][y]);
 				}
 			}
-			solveMatrix(matr_size_x, a, c, b, &f[1], solutions);
+			solveMatrix(matr_size_x, a, c, b, f, solutions);
 			for (int x = 1; x <= matr_size_x; x++){
-				phi[t][x][y] = solutions[x];
+				phi[t][x][y] = solutions[x-1];
 			}
 		}
 		//END: equation 1
-
+		t++;
 		//BEGIN: equation 2
 		//define matrix coefficients
 		b = new double[matr_size_y]; //above main diagonal
@@ -123,31 +130,155 @@ int main(array<System::String ^> ^args){
 			}
 		}	
 		//solve equations systems
+		for (int x = 1; x <= matr_size_x; x++){
+			for (int y = 1; y <= matr_size_y; y++){
+				if (y == 1){
+					f[y-1] = source2D(COORD_LOWER_BOUND_X + x * delta_x, COORD_LOWER_BOUND_Y + y * delta_y) +
+						(1/tau + mu /(delta_y * delta_y)) * phi[t-1][x][y] + 
+						mu / (2 * delta_y * delta_y) * (phi[t][x][y-1] + phi[t-1][x][y+1] + phi[t-1][x][y-1]);
+				} else if (y == matr_size_y){
+					f[y-1] = source2D(COORD_LOWER_BOUND_X + x * delta_x, COORD_LOWER_BOUND_Y + y * delta_y) +
+						(1/tau + mu /(delta_y * delta_y)) * phi[t-1][x][y] + 
+						mu / (2 * delta_y * delta_y) * (phi[t][x][y+1] + phi[t-1][x][y+1] + phi[t-1][x][y-1]);
+				}
+				else{
+					f[y-1] = source2D(COORD_LOWER_BOUND_X + x * delta_x, COORD_LOWER_BOUND_Y + y * delta_y) +
+						(1/tau + mu /(delta_y * delta_y)) * phi[t-1][x][y] + 
+						mu / (2 * delta_y * delta_y) * (phi[t-1][x][y+1] + phi[t-1][x][y-1]);
+				}
+			}
+			solveMatrix(matr_size_y, a, c, b, f, solutions);
+			for (int y = 1; y <= matr_size_y; y++){
+				phi[t][x][y] = solutions[y-1];
+			}
+		}
 		//END: equation 2
+		t++;
+		//BEGIN: equation 3
+		//define matrix coefficients
+		b = new double[matr_size_y]; //above main diagonal
+		c = new double[matr_size_y];	//main diagonal					  
+		a = new double[matr_size_y];	//below main diagonal
+		f = new double[matr_size_y]; //free elements
+		solutions = new double[matr_size_y];
+		for (int i = 0; i <= matr_size_y; i++){
+			c[i] = 1/tau + 2 * mu /(2 * delta_y * delta_x);
+			if (i == 0){
+				a[i] = 0;
+				b[i] = -mu / (2 * delta_y * delta_y);
+			}
+			else if (i == matr_size_y -1){
+				b[i] = 0;
+				a[i] = -mu / (2 * delta_y * delta_y);
+			}
+			else{
+				b[i] = -mu / (2 * delta_y * delta_y);
+				a[i] = -mu / (2 * delta_y * delta_y);
+			}
+		}	
+		//solve equations systems
+		for (int x = 1; x <= matr_size_x; x++){
+			for (int y = 1; y <= matr_size_y; y++){
+				if (y == 1){
+					f[y-1] = source2D(COORD_LOWER_BOUND_X + x * delta_x, COORD_LOWER_BOUND_Y + y * delta_y) +
+						(1/tau + mu /(delta_y * delta_y)) * phi[t-1][x][y] + 
+						mu / (2 * delta_y * delta_y) * (phi[t][x][y-1] + phi[t-1][x][y+1] + phi[t-1][x][y-1]);
+				} else if (y == matr_size_y){
+					f[y-1] = source2D(COORD_LOWER_BOUND_X + x * delta_x, COORD_LOWER_BOUND_Y + y * delta_y) +
+						(1/tau + mu /(delta_y * delta_y)) * phi[t-1][x][y] + 
+						mu / (2 * delta_y * delta_y) * (phi[t][x][y+1] + phi[t-1][x][y+1] + phi[t-1][x][y-1]);
+				}
+				else{
+					f[y-1] = source2D(COORD_LOWER_BOUND_X + x * delta_x, COORD_LOWER_BOUND_Y + y * delta_y) +
+						(1/tau + mu /(delta_y * delta_y)) * phi[t-1][x][y] + 
+						mu / (2 * delta_y * delta_y) * (phi[t-1][x][y+1] + phi[t-1][x][y-1]);
+				}
+			}
+			solveMatrix(matr_size_y, a, c, b, f, solutions);
+			for (int y = 1; y <= matr_size_y; y++){
+				phi[t][x][y] = solutions[y-1];
+			}
+		}
+		//END: equation 3
+		t++;
+		//BEGIN: equation 4
+		//define matrix coefficients
+		b = new double[matr_size_x]; //above main diagonal
+		c = new double[matr_size_x];	//main diagonal					  
+		a = new double[matr_size_x];	//below main diagonal
+		f = new double[matr_size_x]; //free elements
+		solutions = new double[matr_size_x];
+		for (int i = 0; i < matr_size_x; i++){
+			c[i] = 1 / tau + 2 * mu /(2 * delta_x * delta_x);
+			if (i == 0){
+				a[i] = 0;
+				b[i] = -mu / (2 * delta_x * delta_x);
+			}
+			else if (i == matr_size_x - 1){
+				b[i] = 0;
+				a[i] = -mu / (2 * delta_x * delta_x);
+			}
+			else{
+				b[i] = -mu / (2 * delta_x * delta_x);
+				a[i] = -mu / (2 * delta_x * delta_x);
+			}
+		}	
+		//solve equations systems
+		for (int y = 1; y <= matr_size_y; y++){
+			for (int x = 1; x <= matr_size_x; x++){
+				if (x == 1){
+					f[x-1] = phi[t-1][x][y] * (1/tau - mu/(delta_x *delta_x)) + 
+						mu/(2 * delta_x * delta_x) * (phi[t][x-1][y] + phi[t-1][x+1][y] + phi[t-1][x-1][y]); 
+				} else if (x == matr_size_x){
+					f[x-1] = phi[t-1][x][y] * (1/tau - mu/(delta_x * delta_x)) +  
+						mu/(2 * delta_x * delta_x) * (phi[t][x+1][y] + phi[t-1][x+1][y] + phi[t-1][x-1][y]);
+				}
+				else{
+					f[x-1] = phi[t-1][x][y] * (1/tau - mu/(delta_x * delta_x)) +  
+						mu/(2 * delta_x * delta_x) * (phi[t-1][x+1][y] + phi[t-1][x-1][y]);
+				}
+			}
+			solveMatrix(matr_size_x, a, c, b, f, solutions);
+			for (int x = 1; x <= matr_size_x; x++){
+				phi[t][x][y] = solutions[x-1];
+			}
+		}
+		//END: equation 4
+		t++;
 	}
 
-	//END: equation 1
 
 	//output the results
+
+   // Gets a NumberFormatInfo associated with the en-US culture.
+   CultureInfo^ MyCI = gcnew CultureInfo( "en-US",false );
+   NumberFormatInfo^ nfi = MyCI->NumberFormat;
+   nfi->NumberDecimalDigits = 4;
+
 	Console::WriteLine(L"Problem solved");
 	for (int t = 0; t < time_steps; t++){
 		Console::WriteLine(L"{0,8}", "");
-		Console::WriteLine(L"Time = {0,8}", ((TIME_LOWER_BOUND + t*tau)/4).ToString(L"F"));
+		Console::WriteLine(L"Time = {0,8}", ((TIME_LOWER_BOUND + t*tau)/4).ToString(L"F", nfi));
 		Console::Write(L"{0,8}", "");
 		for (int y = 0; y < coord_y_steps; y++){
-			Console::Write(L"{0,8}", (COORD_LOWER_BOUND_Y + y*delta_y).ToString(L"F"));
+			Console::Write(L"{0,8}", (COORD_LOWER_BOUND_Y + y*delta_y).ToString(L"F", nfi));
 		}
 		Console::WriteLine();
 		for (int x = 0; x < coord_x_steps; x++){
-			Console::Write(L"{0,8}", (COORD_LOWER_BOUND_X + x*delta_x).ToString(L"F"));
+			Console::Write(L"{0,8}", (COORD_LOWER_BOUND_X + x*delta_x).ToString(L"F", nfi));
 			for (int y = 0; y < coord_y_steps; y++){
-				Console::Write(L"{0,8}", phi[t][x][y].ToString(L"F"));
+				if (phi[t][x][y] == -1){
+					Console::Write(L"{0,8}", "N/A");
+				}
+				else{
+					Console::Write(L"{0,8}", phi[t][x][y].ToString(L"F", nfi));
+				}
 			}
 			Console::WriteLine();
 		}
 	}
 
-	getch();
+	system("pause");
 	//cleanup
 	for (int t = 0; t < time_steps; t++){
 		for (int x = 0; x < coord_x_steps; x++){
